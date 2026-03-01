@@ -1,0 +1,11 @@
+.DS_Store
+
+# IntelliJ
+.idea/
+*.iml
+
+# Build output
+target/
+
+# Local accidental folder copied from Windows environment
+E:*/
