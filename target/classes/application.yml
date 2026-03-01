@@ -1,0 +1,11 @@
+file-save-path: E:/images/
+server:
+  port: 8080
+  servlet:
+    context-path: /dicom
+logging:
+  level:
+    org.springframework: debug
+
+
+

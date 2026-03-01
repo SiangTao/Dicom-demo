@@ -1,0 +1,11 @@
+file-save-path: ${DICOM_IMAGE_PATH:/Users/taosiang/dicom/images/}
+server:
+  port: 8080
+  servlet:
+    context-path: /dicom
+logging:
+  level:
+    org.springframework: debug
+
+
+
