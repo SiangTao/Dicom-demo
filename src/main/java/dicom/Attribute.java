@@ -14,6 +14,9 @@ public class Attribute {
     private AttributeTag tag;
     private static final Logger logger = LogManager.getLogger(Attribute.class);
 
+    private SQnestedAttributeMap sQnestedAttributeMap;
+    private Attribute attribute;
+
     protected String VR; //数据类型
     protected int VL; //数据长度
     protected String VF; //数据内容
@@ -119,10 +122,11 @@ public class Attribute {
     /**
      * 读取VL
      * @author
-     * @param b,location,specialVR
+     * @param b,location,specialVR,s
      * @return int
      */
-    public int readVL(byte[] b, int location, boolean specialVR) {
+    //把AttributeTag传到readSQ中，方便存储当前的Tag信息
+    public int readVL(byte[] b, int location, boolean specialVR,AttributeTag attributeTag,SQnestedAttributeMap sQnestedAttributeMap) {
 
         /* 初始化 */
         setSkip(false);
@@ -148,8 +152,10 @@ public class Attribute {
 
             setSkip(true); //当进入嵌套时，使用特殊readSQ()函数，不再使用普通数据类型的readVF()
 
+            //一个嵌套中仅需要一个AttributeMap,为了方便核实后续一个嵌套中是否存在多组相同的Tag
+            AttributeMap attributeMap=new AttributeMap();
             while (isLoopSQ(b, location)) {
-                location = readSQ(b, location);
+                location = readSQ(b, location,attributeTag,sQnestedAttributeMap,attributeMap);
             }
 
             /* isLoopSQ后location位置未变，手动增加 */
@@ -222,7 +228,8 @@ public class Attribute {
      * @param b,location
      * @return int
      */
-    public int readSQ(byte[] b, int location) {
+    //AttributeTag继续往readSQVF里传
+    public int readSQ(byte[] b, int location,AttributeTag attributeTag,SQnestedAttributeMap sQnestedAttributeMap,AttributeMap attributeMap) {
 
         StringBuilder tagsb = new StringBuilder();//存储嵌套中的tag
         StringBuilder VLsb = new StringBuilder();//存储嵌套中的VL
@@ -245,7 +252,7 @@ public class Attribute {
 
             /* "ff ff ff ff"是嵌套中的VL值 */
             if ("ffffffff".contentEquals(VLsb)) {
-                location=readSQVF_unknownlen(b,location); //情况一（大多数情况下），长度未知
+                location=readSQVF_unknownlen(b,location,attributeTag,sQnestedAttributeMap,attributeMap); //情况一（大多数情况下），长度未知
             }
 
             /* 除了"ff ff ff ff"这种未定义数据长度的情况，还有写明VL的数值 */
@@ -266,11 +273,63 @@ public class Attribute {
      * @param b,location
      * @return int 返回location的值
      */
-    public int readSQVF_unknownlen(byte[] b,int location){
+    public int readSQVF_unknownlen(byte[] b,int location,AttributeTag attributeTag_original,SQnestedAttributeMap sQnestedAttributeMap,AttributeMap attributeMap){
         StringBuilder VFsb=new StringBuilder();
+        StringBuilder isover=new StringBuilder();
 
-        for (int i = 0; ; i++) {
-            /* 读取VF值，当出现"fe ff 0d e0","00 00 00 00"则是嵌套结束标志 */
+        AttributeTag attributeTag=new AttributeTag();
+        attribute=new Attribute(attributeTag);
+        //attributeMap=new AttributeMap(attributeTag,attribute);
+
+        for(int j=0;j<8;j++){
+            //先读取8位来判断是否是结束标识符
+            isover.append(String.format("%02x", b[location++]));
+        }
+        while(!"feff0de000000000".contentEquals(isover)){
+            //回到原位
+            location=location-8;
+            int start=location;
+
+            //正常读取Tag的信息
+            attributeTag=new AttributeTag();
+            attribute=new Attribute(attributeTag);
+            int x=attributeTag.readTag(b,location);
+            int y=attribute.readVR(b,x);
+            int z=attribute.readVL(b,y,attribute.getspecialVR(),attributeTag,sQnestedAttributeMap);
+            location=attribute.readVF(b,z);
+
+            //判断一个嵌套中是否存在多个item（item中Tag位可能相同，会导致Map中相同的Key的Value覆盖问题），所以检查Key和当前的Tag是否相同
+            int num=0;
+            for(String groupelement : attributeMap.getKey()){
+                //Key必须去掉下方增加的“第几组”样式
+                if(groupelement.substring(0,9).equals(attributeTag.getTag())){
+                    num++;
+                }
+            }
+            if(num>0){
+                String newGroupele=attributeTag.getTag()+"_第"+num+"组";
+                attributeMap.addObject(newGroupele,attribute);
+            }
+            //添加到Map中
+            attributeMap.addObject(attributeTag,attribute);
+
+            //在原先SQ类型的Tag中继续保存VL值，方便查看嵌套读取的Tag是否正确
+            for(int i=start;i<location;i++){
+                VFsb.append(String.format("%02x", b[i]));
+            }
+
+            //由于前面已经按规则读取过Tag、VR等，所以可以直接读取8位16进制数来判断，不用担心读错位的问题
+            //先删除之前保存的8位16进制数，然后在读取8位，让while去判断是否读到结束符
+            isover.delete(0,16);
+            for(int j=0;j<8;j++){
+                isover.append(String.format("%02x", b[location++]));
+            }
+        }
+        //往SQ嵌套的Map中传
+        sQnestedAttributeMap.addObject_SQ(attributeTag_original,attributeMap);
+
+        /*for (int i = 0; ; i++) {
+            *//* 读取VF值，当出现"fe ff 0d e0","00 00 00 00"则是嵌套结束标志 *//*
             VFsb.append(String.format("%02x", b[location++]));
 
             if (VFsb.indexOf("feff0de000000000") != -1) {
@@ -279,8 +338,9 @@ public class Attribute {
         }
 
         VFsb.delete(VFsb.length() - 16, VFsb.length()); //删除结束标志
+        */
 
-        VF = VF + VFsb.toString();
+        VF = VF + VFsb.toString(); //保存的是最外层的Value信息
 
         return location;
     }
@@ -313,3 +373,5 @@ public class Attribute {
     }
 
 }
+//dicom通讯
+//本地网络上传和下载

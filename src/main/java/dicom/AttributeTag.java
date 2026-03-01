@@ -78,4 +78,15 @@ public class AttributeTag {
 
         return location;
     }
+
+    public String getTag(){
+        StringBuilder sb = new StringBuilder();
+        sb
+                .append(group)
+                .append(",")
+                .append(element);
+        String s = "";
+        s = sb.toString();
+        return s;
+    }
 }

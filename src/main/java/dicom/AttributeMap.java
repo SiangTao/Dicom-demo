@@ -3,8 +3,6 @@ package dicom;
 import dicom.entity.TagInfo;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-
-import javax.swing.text.html.HTML;
 import java.util.*;
 
 /**
@@ -17,10 +15,15 @@ public class AttributeMap {
     private static final Logger logger = LogManager.getLogger(AttributeMap.class);
 
     /** 使用LinkedHashMap，可以做到有序存储，便于输出*/
-    private Map<String, Attribute> attributemap = new LinkedHashMap<>();
+    public Map<String, Attribute> attributemap = new LinkedHashMap<>();
 
     private AttributeTag attributeTag;
     private Attribute attribute;
+
+    public AttributeMap(){
+        this.attributeTag = null;
+        this.attribute = null;
+    }
 
     public AttributeMap(AttributeTag attributeTag, Attribute attribute) {
         this.attributeTag = attributeTag;
@@ -51,6 +54,18 @@ public class AttributeMap {
         s = sb.toString();
 
         attributemap.put(s, attribute);
+    }
+
+    public void addObject(String groupelement, Attribute attribute) {
+
+        if (groupelement == null) {
+            logger.error("Group和element为空！");
+        }
+        if (attribute == null) {
+            logger.error("数据部分为空！");
+        }
+
+        attributemap.put(groupelement, attribute);
     }
 
     /**
@@ -89,4 +104,8 @@ public class AttributeMap {
         return list;
     }
 
+    public Set<String> getKey(){
+        Set<String> set = attributemap.keySet();
+        return  set;
+    }
 }

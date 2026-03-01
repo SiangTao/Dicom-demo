@@ -15,17 +15,17 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
 
-  <repositories>
+    <repositories>
         <repository>
             <id>org.dcm4chee</id>
             <name>DCM4CHE</name>
-            <url>http://www.dcm4che.org/maven2/</url>
+            <url>https://www.dcm4che.org/maven2/</url>
         </repository>
 
       <repository>
           <id>org.weasis</id>
           <name>weasis</name>
-          <url>https://github.com/nroduit/mvn-repo/tree/master/</url>
+          <url>https://weasis.org/mvn-repo/</url>
       </repository>
 
     </repositories>
@@ -113,18 +113,12 @@
             <artifactId>weasis-opencv-core</artifactId>
             <version>3.5.3</version>
         </dependency>
+
         <!--dcm end-->
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
-        </dependency>
-
-
-
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-devtools</artifactId>
         </dependency>
 
         <dependency>

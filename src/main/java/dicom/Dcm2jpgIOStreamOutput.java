@@ -3,7 +3,10 @@ package dicom;
 import java.awt.image.BufferedImage;
 import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.time.format.TextStyle;
 import java.util.Iterator;
 
 import javax.imageio.ImageIO;
@@ -14,6 +17,9 @@ import javax.imageio.stream.ImageInputStream;
 import org.dcm4che3.data.Attributes;
 import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam;
 import org.dcm4che3.util.SafeClose;
+
+import com.sun.image.codec.jpeg.JPEGCodec;
+import com.sun.image.codec.jpeg.JPEGImageEncoder;
 
 
 public class Dcm2jpgIOStreamOutput {
@@ -85,6 +91,7 @@ public class Dcm2jpgIOStreamOutput {
         ImageReader reader = iter.next();
         ImageInputStream iis = ImageIO.createImageInputStream(src);
         BufferedImage bi;
+        OutputStream out = null;
         try{
             reader.setInput(iis, false);
             bi = readImage(iis);
@@ -92,11 +99,12 @@ public class Dcm2jpgIOStreamOutput {
                 System.out.println("\nError: " + src + " - couldn't read!");
                 return;
             }
-            try (BufferedOutputStream out = new BufferedOutputStream(java.nio.file.Files.newOutputStream(dest.toPath()))) {
-                ImageIO.write(bi, "jpg", out);
-            }
+            out = new BufferedOutputStream(new FileOutputStream(dest));
+            JPEGImageEncoder enc = JPEGCodec.createJPEGEncoder(out);  //这里也可以使用流将图像导出到web应用，用来搭建web版的PACS等。
+            enc.encode(bi);
         }finally{
             SafeClose.close(iis);
+            SafeClose.close(out);
         }
     }
 

@@ -2,6 +2,8 @@ package dicom.service.impl;
 
 import com.alibaba.fastjson.JSONObject;
 import dicom.ReadDicom;
+import dicom.entity.Result;
+import dicom.entity.SQTagInfo;
 import dicom.entity.TagInfo;
 import dicom.service.GetDicomService;
 import org.apache.logging.log4j.LogManager;
@@ -32,9 +34,16 @@ public class GetDicomServiceimpl implements GetDicomService {
         File dicomfile= MutipartFileToFileUtil.MultipartFileToFile(file);
 
         ReadDicom readDicom=new ReadDicom();
-        List<TagInfo> list=readDicom.readDicom(dicomfile);
+        readDicom.readDicom(dicomfile);
 
-        String json=JSONObject.toJSONString(list);
+        List<TagInfo> list=readDicom.getTagInfo();
+        List<SQTagInfo> sqTagInfo=readDicom.getSQTagInfo();
+        File out= readDicom.readPixel(dicomfile);
+        String fileName=out.getName();
+        String url= ServletUtils.getImageUrl(fileName);
+        Result result=new Result(sqTagInfo,list,url);
+
+        String json=JSONObject.toJSONString(result);
         return json;
     }
 

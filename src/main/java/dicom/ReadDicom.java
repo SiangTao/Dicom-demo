@@ -1,19 +1,20 @@
 package dicom;
 
+import dicom.entity.SQTagInfo;
 import dicom.entity.TagInfo;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.dcm4che3.tool.dcm2jpg.Dcm2Jpg;
 import utils.RadixChangeUtil;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
 建立一个读取Dicom文件的类，包含判断文件类型以及解析数据的功能
@@ -31,19 +32,25 @@ public class ReadDicom {
     /** 定义输出格式 */
     public static final String FORMAT_STR="%02x";
 
+    private List<TagInfo>list;
+
+    private List<SQTagInfo> sqTagInfoList;
+
+    public ReadDicom(){
+        list=null;
+        sqTagInfoList=null;
+    }
 
     /**
      * 在主函数中调取该方法可以对Dicom文件进行读取和解析
      * @author
      * @param file 用户上传的文件
      */
-    public static List<TagInfo> readDicom(File file) {
-
-        List<TagInfo> list=null;
+    public void readDicom(File file) {
 
         /* 判断用户上传是否是文件类型 */
         if(!IsFile(file)){
-            return list;
+            return ;
         }
 
         /* 读取文件 */
@@ -56,10 +63,12 @@ public class ReadDicom {
             printDicom(b);
 
             /* 解读Dicom文件 */
-            list=analysisDicom();
+            analysisDicom();
 
+            /* 读取图片 */
+            readPixel(file);
         }
-        return list;
+
     }
 
 
@@ -69,7 +78,7 @@ public class ReadDicom {
      * @param file 用户上传的文件
      * @return boolean
      */
-    public static boolean IsFile(File file){
+    public boolean IsFile(File file){
         if(file.isFile()){
             logger.info("用户上传为文件");
             return true;
@@ -87,7 +96,7 @@ public class ReadDicom {
      * @param file 用户上传的文件
      * @return byte[]
      */
-    public static byte[] readdata(File file){
+    public byte[] readdata(File file){
         logger.info("开始读取文件");
 
         try (FileInputStream fis = new FileInputStream(file);
@@ -111,7 +120,7 @@ public class ReadDicom {
      * @param b 文件的字节数组
      * @return boolean
      */
-    public static boolean IsDicomfile(byte[] b){
+    public boolean IsDicomfile(byte[] b){
 
         if (b.length < 132) {
             logger.error("不是DICOM文件！");
@@ -139,10 +148,9 @@ public class ReadDicom {
      * @author tsa
      * @param b 文件的字节数组
      */
-    public static void printDicom(byte[] b){
+    public void printDicom(byte[] b){
         logger.info("开始读取DICOM文件：");
 
-        //i<file.length()太大，先以50000代替
         for (int i = 0; i < b.length; i++) {
             if (b[i] < 0) {
                 int temp = b[i] + 256;
@@ -169,11 +177,7 @@ public class ReadDicom {
      * @Author: tsa
      * @Date: 2023/8/7 14:11
      */
-    public static File readPixel(File src){
-        return readPixel(src, System.getProperty("user.home") + "/dicom/images/");
-    }
-
-    public static File readPixel(File src, String outputDir){
+    public File readPixel(File src){
 
         SimpleDateFormat format = new SimpleDateFormat("yyyyMMddHHmmss"); // 设置格式
         Long currentTime = System.currentTimeMillis();  // 获取当前时间戳
@@ -184,13 +188,9 @@ public class ReadDicom {
         int suffix=fileName.lastIndexOf(".");
         String newfileName=fileName.substring(0,suffix)+timeString+".jpg";
 
-        Path outputPath = Paths.get(outputDir);
-        try {
-            Files.createDirectories(outputPath);
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to create image output directory: " + outputPath, e);
-        }
-        File out = outputPath.resolve(newfileName).toFile();
+        /* 文件保存路径  */
+        String filepath="/Users/taosiang/dicom/images/"+newfileName;
+        File out=new File(filepath);
 
         try {
             Dcm2jpgIOStreamOutput dcm2jpg = new Dcm2jpgIOStreamOutput();
@@ -210,18 +210,20 @@ public class ReadDicom {
      */
 
     //void类型修改为List，方便满足读取Tag位后保存至TagInfo类中
-    public static List<TagInfo> analysisDicom() {
+    public void analysisDicom() {
 
         AttributeTag attributeTag = new AttributeTag();
         Attribute attribute = new Attribute(attributeTag);
         AttributeMap attributeMap = new AttributeMap(attributeTag, attribute);
+        SQnestedAttributeMap sQnestedAttributeMap=new SQnestedAttributeMap(attributeTag,attributeMap);
+
 
         /* 每次读取对应内容后都会返回整形的location，代表了在字节数组中的下标，作为下个函数的参数传入 */
         int location = attribute.readVF(
                 b, attribute.readVL(
                         b, attribute.readVR(
                                 b, attributeTag.readTag(
-                                        b, 132)), false)); /* 首次运行，将location设为132=128+4*/
+                                        b, 132)), false,attributeTag,sQnestedAttributeMap)); /* 首次运行，将location设为132=128+4*/
 
         attributeMap.addObject(attributeTag, attribute);
 
@@ -237,14 +239,25 @@ public class ReadDicom {
                 break;
             }
 
-            TEMP = attributetemp.readVL(b, temp, attributetemp.getspecialVR());
+            TEMP = attributetemp.readVL(b, temp, attributetemp.getspecialVR(),attributeTagtemp,sQnestedAttributeMap);
             location = attributetemp.readVF(b, TEMP);
             attributeMap.addObject(attributeTagtemp, attributetemp);
         }
 
         /* 打印解析后的信息*/
         attributeMap.print();
-        List<TagInfo>list = attributeMap.MapToObjectArr();
+        sQnestedAttributeMap.printSQMap();
+
+        this.list = attributeMap.MapToObjectArr();
+        this.sqTagInfoList=sQnestedAttributeMap.SQMapToObjectArr();
+
+    }
+
+    public List<TagInfo> getTagInfo(){
         return list;
+    }
+
+    public List<SQTagInfo> getSQTagInfo(){
+        return sqTagInfoList;
     }
 }

@@ -1,4 +1,4 @@
-file-save-path: E:/images/
+file-save-path: ${DICOM_IMAGE_PATH:/Users/taosiang/dicom/images/}
 server:
   port: 8080
   servlet:

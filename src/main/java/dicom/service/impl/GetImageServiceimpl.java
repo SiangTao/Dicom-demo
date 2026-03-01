@@ -26,7 +26,7 @@ public class GetImageServiceimpl implements GetImageService {
     public String getImage(MultipartFile file) {
         File dicomfile= MutipartFileToFileUtil.MultipartFileToFile(file);
         ReadDicom readDicom=new ReadDicom();
-        File out= readDicom.readPixel(dicomfile, fileSavePath);
+        File out= readDicom.readPixel(dicomfile);
         String fileName=out.getName();
         String url= ServletUtils.getImageUrl(fileName);
         return url;
